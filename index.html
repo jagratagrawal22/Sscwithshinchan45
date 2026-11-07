@@ -420,6 +420,13 @@ body.sb-collapsed .sidebar{transform:translateX(-100%)}
 .pm .act.pmq{background:linear-gradient(135deg,#ec4899,#db2777)}
 .pm .act.pmp{background:linear-gradient(135deg,#06b6d4,#0891b2)}
 @media(max-width:600px){.pm{padding:18px 12px 26px;border-radius:20px}.pm-hd h1{font-size:34px}}
+
+/* ---------- CUSTOM FOLDERS (admin se add: Main > Sub > Video + PDF 1 + PDF 2) ---------- */
+.row.lec.cf .lacts{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;flex:0 0 auto;width:min(58%,380px);max-width:none}
+.row.lec.cf .act{justify-content:center;padding:8px 6px;min-width:0;white-space:nowrap}
+@media(max-width:760px){.row.lec.cf .lacts{flex:1 1 100%;width:auto;max-width:none}}
+#ap.cfmode #apCopy,#ap.cfmode #apOpen,#ap.cfmode #apAlt{display:none}
+#ap.cfmode video{background:#000;object-fit:contain}
 </style>
 </head>
 <body class="">
@@ -799,8 +806,8 @@ function crumbs(parts){
 }
 function videosPage(){
   return crumbs([['Videos']])+
-  '<div class="page-head"><span class="ph-ico c-blue">'+ic('cam')+'</span><div><h2>Video Lectures</h2><p>'+(T.length+6)+' folders · '+fmt(totalVideos+AM_V+NT_V+AC_V+SP_V+SU_V+PM_V)+' videos — folder kholo aur class chuno</p></div></div>'+
-  '<div class="folder-grid">'+pmCard()+suCard()+spCard()+acVideoCard()+ntVideoCard()+amanCard()+T.map(function(t){return folderCard(t)}).join('')+'</div>';
+  '<div class="page-head"><span class="ph-ico c-blue">'+ic('cam')+'</span><div><h2>Video Lectures</h2><p>'+(T.length+6+CF.mains.length)+' folders · '+fmt(totalVideos+AM_V+NT_V+AC_V+SP_V+SU_V+PM_V+cfVideos())+' videos — folder kholo aur class chuno</p></div></div>'+
+  '<div class="folder-grid">'+cfCards()+pmCard()+suCard()+spCard()+acVideoCard()+ntVideoCard()+amanCard()+T.map(function(t){return folderCard(t)}).join('')+'</div>';
 }
 function teachersPage(){
   return crumbs([['Teachers']])+
@@ -1291,7 +1298,7 @@ $('#apSpeed').addEventListener('click',function(e){
   apv.playbackRate=+b.dataset.s;
   $$('#apSpeed button').forEach(function(x){x.classList.toggle('on',x===b)});
 });
-function amShowErr(msg){$('#apMsg').textContent=msg;$('#apErr').style.display='block'}
+function amShowErr(msg){if(ap.classList.contains('cfmode'))msg='Video chal nahi paya. Internet check karke Retry dabayein.';$('#apMsg').textContent=msg;$('#apErr').style.display='block'}
 function amEnsureHls(cb){
   if(window.Hls){cb();return}
   var sc=document.createElement('script');sc.src=HLS_SRC;sc.onload=cb;sc.onerror=cb;document.head.appendChild(sc);
@@ -1335,7 +1342,7 @@ function amClose(){
   if(!ap.classList.contains('open'))return;
   aCur={url:'',title:''};apv.pause();apv.removeAttribute('src');apv.load();
   if(aHls){aHls.destroy();aHls=null}
-  ap.classList.remove('open');document.body.style.overflow='';$('#apErr').style.display='none';
+  ap.classList.remove('open');ap.classList.remove('cfmode');document.body.style.overflow='';$('#apErr').style.display='none';
 }
 $('#apClose').addEventListener('click',amClose);
 document.addEventListener('keydown',function(e){if(e.key==='Escape')amClose()});
@@ -1446,6 +1453,7 @@ function route(){
   else if(p==='achpdf'){out=acPage('p',arg);nav='pdfs'}
   else if(p==='spartans'){out=arg?spFolderPage(arg):spRootPage();nav='videos'}
   else if(p==='parmar'){out=pmPage(arg);nav='videos'}
+  else if(p==='cf'){out=cfPage(arg);nav='videos'}
   else if(p==='super100'){out=arg?suFolderPage(arg):suRootPage();nav='videos'}
   else if(p==='images'){out=imagesPage();nav='home'}
   else if(p==='search'){out=searchPage(arg);nav=''}
@@ -1500,6 +1508,115 @@ $('#fab').addEventListener('click',function(){
 /* assign extra fields */
 T.forEach(function(t){t.items.forEach(function(it,j){it.idx=j})});
 
+
+/* ---------- CUSTOM FOLDERS: admin se bane Main folder > Sub folder > Video (video link + PDF 1 + PDF 2) ---------- */
+var CF={mains:[],loaded:false,err:''};
+function cfKey(m){return accRootKey({id:'cf-'+m.id})}
+function cfVideos(){return CF.mains.reduce(function(a,m){return a+m.v},0)}
+function cfBuild(rows){
+  var byId={};
+  rows.forEach(function(r){r.kids=[];byId[r.id]=r});
+  rows.forEach(function(r){if(r.parent_id&&byId[r.parent_id])byId[r.parent_id].kids.push(r)});
+  function srt(a,b){return ((+a.sort_order)-(+b.sort_order))||String(a.created_at).localeCompare(String(b.created_at))}
+  var mains=[];
+  rows.filter(function(r){return r.kind==='main'}).sort(srt).forEach(function(m,mi){
+    var v=0,p=0;
+    var subs=m.kids.filter(function(x){return x.kind==='sub'}).sort(srt).map(function(s){
+      var items=s.kids.filter(function(x){return x.kind==='item'}).sort(srt).map(function(x,j){
+        if(x.video_url)v++;if(x.pdf1_url)p++;if(x.pdf2_url)p++;
+        return {id:x.id,t:x.name,v:x.video_url||'',p1:x.pdf1_url||'',p2:x.pdf2_url||'',idx:j,l:(x.name+' '+s.name+' '+m.name).toLowerCase()};
+      });
+      return {id:s.id,n:s.name,items:items};
+    });
+    mains.push({id:m.id,n:m.name,i:mi,subs:subs,v:v,p:p});
+  });
+  return mains;
+}
+async function cfLoad(){
+  var db=window.SSC_DB;
+  if(!db){CF.loaded=true;return}
+  try{
+    var all=[],from=0,step=1000;
+    for(;;){
+      var r=await db.from('custom_content').select('*').order('created_at',{ascending:true}).range(from,from+step-1);
+      if(r.error)throw r.error;
+      all=all.concat(r.data||[]);
+      if(!r.data||r.data.length<step)break;
+      from+=step;
+    }
+    CF.mains=cfBuild(all);CF.err='';
+  }catch(e){CF.err=(e&&e.message)||'Load error';console.warn('Custom folders load failed',e)}
+  CF.loaded=true;
+  document.dispatchEvent(new Event('ssc-cf-updated'));
+  if(/^#\/(videos|cf|subject)/.test(location.hash)){var y=window.scrollY;route();window.scrollTo(0,y)}
+}
+window.SSC_CF={reload:cfLoad,data:function(){return CF}};
+function cfCards(){
+  return CF.mains.map(function(m){
+    return '<a class="fcard" href="#/cf/'+m.id+'"><span class="fic '+GRAD[m.i%GRAD.length]+'">'+ic('folder')+'</span><div style="min-width:0"><b>'+esc(m.n)+'</b><small>'+m.subs.length+' folders · '+fmt(m.v)+' videos · '+fmt(m.p)+' PDFs</small></div><span class="go">'+ic('chevr')+'</span></a>';
+  }).join('');
+}
+function cfPage(arg){
+  if(!CF.loaded)return '<div class="empty">Loading…</div>';
+  var a=String(arg||'').split('/'), m=CF.mains.filter(function(x){return x.id===a[0]})[0];
+  if(!m)return notFound();
+  if(a[1]){var s=m.subs.filter(function(x){return x.id===a[1]})[0];if(!s)return notFound();return cfSubPage(m,s)}
+  return cfMainPage(m);
+}
+function cfMainPage(m){
+  return crumbs([['Videos','#/videos'],[m.n]])+
+  '<div class="page-head"><a class="backbtn" href="#/videos">'+ic('chevl')+' Back</a><span class="ph-ico '+GRAD[m.i%GRAD.length]+'">'+ic('folder')+'</span><div><h2>'+esc(m.n)+'</h2><p>'+m.subs.length+' folders · '+fmt(m.v)+' videos · '+fmt(m.p)+' PDFs</p></div></div>'+
+  (m.subs.length?'<div class="folder-grid">'+m.subs.map(function(s,k){
+    var v=0;s.items.forEach(function(x){if(x.v)v++});
+    return '<a class="fcard" href="#/cf/'+m.id+'/'+s.id+'"><span class="fic '+GRAD[k%GRAD.length]+'">'+ic('folder')+'</span><div style="min-width:0"><b>'+esc(s.n)+'</b><small>'+fmt(s.items.length)+' classes · '+fmt(v)+' videos</small></div><span class="go">'+ic('chevr')+'</span></a>';
+  }).join('')+'</div>':'<div class="empty">Abhi is folder me kuch add nahi hua ✨</div>');
+}
+function cfSubPage(m,s){
+  var html=crumbs([['Videos','#/videos'],[m.n,'#/cf/'+m.id],[s.n]])+
+   '<div class="page-head"><a class="backbtn" href="#/cf/'+m.id+'">'+ic('chevl')+' Back</a><span class="ph-ico '+GRAD[m.i%GRAD.length]+'">'+ic('folder')+'</span><div><h2>'+esc(s.n)+'</h2><p>'+fmt(s.items.length)+' classes</p></div></div><div id="listHost"></div>';
+  return {html:html,mount:function(){
+    var host=$('#listHost');
+    if(!s.items.length){host.innerHTML='<div class="empty">Abhi is folder me kuch add nahi hua ✨</div>';return}
+    mountList(host,{all:s.items,unit:'classes',placeholder:'Is folder me search karo...',row:function(it,n){return cfRow(m,it,n)}});
+    host.addEventListener('click',function(e){cfClick(e,s)});
+  }};
+}
+function cfRow(m,it,n){
+  var b=(it.v?'<button class="act play" data-a="cfv">'+ic('play','f')+' VIDEO</button>':'<span></span>')+
+        (it.p1?'<button class="act pdf" data-a="cfp1">'+ic('file')+' PDF 1</button>':'<span></span>')+
+        (it.p2?'<button class="act pdf" data-a="cfp2">'+ic('file')+' PDF 2</button>':'<span></span>');
+  return '<div class="row lec cf" data-fk="'+esc(cfKey(m))+'" data-ci="'+it.idx+'"><span class="n">'+n+'.</span><div class="tt">'+esc(it.t)+'</div><div class="lacts">'+b+'</div></div>';
+}
+function cfClick(e,s){
+  var b=e.target.closest('[data-a]');if(!b)return;
+  var r=b.closest('.row');if(!r||r.dataset.ci===undefined)return;
+  var it=s.items[+r.dataset.ci];if(!it)return;
+  if(b.dataset.a==='cfv')cfPlay(it);
+  else cfPdf(b.dataset.a==='cfp1'?it.p1:it.p2,it.t);
+}
+/* Video app ke andar hi (full-screen overlay) chalta hai: naya browser tab nahi khulta, isliye upar link/address bar nahi dikhta */
+function cfPlay(it){
+  var u=it.v;if(!u){toast('Video link nahi hai');return}
+  aCur={url:u,title:it.t,cf:true,id:it.id};aRetry={net:0,media:0};
+  ap.classList.add('cfmode');
+  apv.setAttribute('controlsList','nodownload noremoteplayback');apv.setAttribute('disablePictureInPicture','');apv.preload='auto';
+  apv.playbackRate=1;$$('#apSpeed button').forEach(function(x){x.classList.toggle('on',x.dataset.s==='1')});
+  $('#apTitle').textContent=it.t;ap.classList.add('open');document.body.style.overflow='hidden';
+  var pos=+store('cfpos:'+it.id)||0;
+  if(pos>5){var once=function(){apv.removeEventListener('loadedmetadata',once);try{if(!apv.duration||pos<apv.duration-10)apv.currentTime=pos}catch(e){}};apv.addEventListener('loadedmetadata',once)}
+  amStart(u);
+}
+var cfLast=0;
+apv.addEventListener('timeupdate',function(){if(!aCur.cf||!aCur.id)return;var t=Date.now();if(t-cfLast<5000)return;cfLast=t;store('cfpos:'+aCur.id,String(Math.floor(apv.currentTime)))});
+apv.addEventListener('ended',function(){if(aCur.cf&&aCur.id)store('cfpos:'+aCur.id,'0')});
+apv.addEventListener('contextmenu',function(e){if(aCur.cf)e.preventDefault()});
+function cfPdf(u,name){
+  if(!u){toast('PDF link nahi hai');return}
+  var a=document.createElement('a');a.href=u;a.target='_blank';a.rel='noopener noreferrer';a.setAttribute('download',(name||'file')+'.pdf');
+  document.body.appendChild(a);a.click();a.remove();
+}
+setTimeout(cfLoad,0);
+
 /* ---------- ACCESS REGISTRY: admin "Grant Access" list yahi se banti hai ---------- */
 /* Naya teacher folder (D.teachers me) ya naya *_ROOT folder add karoge to yeh list me apne aap aa jaega. */
 window.SSC_ACCESS={
@@ -1513,6 +1630,7 @@ window.SSC_ACCESS={
     add(accRootKey(SPR),SP_NAME,SP_V,SP_P);
     add(accRootKey(SUR),SU_NAME,SU_V,SU_P);
     add(accRootKey(PMR),PM_NAME,PM_V,PM_P);
+    CF.mains.forEach(function(m){add(cfKey(m),m.n,m.v,m.p)});
     T.forEach(function(t){add(accTeacherKey(t),t.n,t.items.length,pc[accTeacherKey(t)]||0)});
     /* future: koi bhi naya window.XYZ_ROOT = {id,name,...} bhi list me aa jaega */
     Object.keys(window).forEach(function(k){
@@ -1576,7 +1694,7 @@ route();
  var URL='https://ownxtbavzwctjzyaydqe.supabase.co';
  var KEY='sb_publishable_lh74B7mz7ESg0I_pLzTmvw_XA2ETY97';
  if(!window.supabase||!window.supabase.createClient)return;
- var db=window.supabase.createClient(URL,KEY), user=null, admin=false, legacy=false, grants={}, checking=true;
+ var db=window.SSC_DB=window.supabase.createClient(URL,KEY), user=null, admin=false, legacy=false, grants={}, checking=true;
  var $=function(id){return document.getElementById(id)};
  var DUR=[[6,'6 months'],[12,'1 year'],[24,'2 years'],[60,'5 years']];
  function esc(x){return String(x).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})}
@@ -1640,7 +1758,135 @@ route();
    finally{b.disabled=false;b.textContent='Grant Access'}
   });
  }
- async function refreshAccess(){
+  /* ---------- ADMIN: Custom Folders (Main folder > Sub folder > Video + PDF 1 + PDF 2) ---------- */
+  var cfEdit=null;
+  function cfData(){return (window.SSC_CF&&window.SSC_CF.data().mains)||[]}
+  function cfMsg(t,ok){var m=$('cfAdminMsg');if(!m)return;m.textContent=t||'';m.className='auth-msg'+(t?(ok?' ok':' error'):'')}
+  function cfOpts(list,sel,ph){return (list.length?'':'<option value="">'+ph+'</option>')+list.map(function(x){return '<option value="'+esc(x.id)+'"'+(x.id===sel?' selected':'')+'>'+esc(x.n)+'</option>'}).join('')}
+  function cfFillItemSub(sel){
+   var im=$('cfItemMain'),is=$('cfItemSub');if(!im||!is)return;
+   var m=cfData().filter(function(x){return x.id===im.value})[0];
+   is.innerHTML=cfOpts(m?m.subs:[],sel,'— pehle sub folder banao —');
+  }
+  function cfRenderTree(){
+   var host=$('cfTree');if(!host)return;
+   var mains=cfData();
+   if(!mains.length){host.innerHTML='<p class="cf-hint">Abhi koi custom folder nahi hai.</p>';return}
+   host.innerHTML=mains.map(function(m){
+    return '<details class="cf-m"><summary><span>📁 '+esc(m.n)+'</span><button type="button" class="cf-x" data-del="'+esc(m.id)+'" data-dn="'+esc(m.n)+'">✕</button></summary>'+
+     (m.subs.map(function(s){
+      return '<details class="cf-s"><summary><span>'+esc(s.n)+' ('+s.items.length+')</span><button type="button" class="cf-x" data-del="'+esc(s.id)+'" data-dn="'+esc(s.n)+'">✕</button></summary>'+
+       s.items.map(function(it){return '<div class="cf-it"><span>'+esc(it.t)+'</span><button type="button" class="cf-e" data-edit="'+esc(it.id)+'">✎</button><button type="button" class="cf-x" data-del="'+esc(it.id)+'" data-dn="'+esc(it.t)+'">✕</button></div>'}).join('')+'</details>';
+     }).join(''))+'</details>';
+   }).join('');
+  }
+  function cfFillSelects(){
+   var mains=cfData(),sm=$('cfSubMain'),im=$('cfItemMain'),is=$('cfItemSub');if(!sm||!im||!is)return;
+   var a=sm.value,b=im.value,c=is.value;
+   sm.innerHTML=cfOpts(mains,a,'— pehle main folder banao —');
+   im.innerHTML=cfOpts(mains,b,'— pehle main folder banao —');
+   cfFillItemSub(c);cfRenderTree();
+  }
+  function refreshGrantList(){
+   var host=$('grantFolderList');if(!host)return;
+   var on={};Array.prototype.forEach.call(host.querySelectorAll('.gf-cb:checked'),function(c){on[c.value]=1});
+   renderFolders();
+   var all=$('grantAllFolders');
+   Array.prototype.forEach.call(host.querySelectorAll('.gf-cb'),function(c){if(on[c.value])c.checked=true;if(all&&all.checked)c.disabled=true});
+  }
+  async function cfRun(btn,fn){
+   var old=btn.textContent;btn.disabled=true;btn.textContent='Please wait…';cfMsg('');
+   try{await fn()}
+   catch(e){cfMsg((e&&e.message?e.message:'Kuch galat ho gaya.')+' — agar table missing ho to custom_content.sql Supabase SQL Editor me run karein.')}
+   finally{btn.disabled=false;btn.textContent=old}
+  }
+  async function cfInsert(row){
+   var r=await db.from('custom_content').insert(row).select().single();
+   if(r.error)throw r.error;return r.data;
+  }
+  function cfUrlOk(u){return !u||/^https?:\/\//i.test(u)}
+  function cfResetItemForm(){
+   cfEdit=null;['cfItemName','cfItemVideo','cfItemP1','cfItemP2'].forEach(function(id){$(id).value=''});
+   $('cfItemBtn').textContent='Add Video';$('cfItemCancel').hidden=true;
+  }
+  function installCfAdmin(){
+   var card=document.querySelector('#authModal .auth-card');if(!card||$('cfAdminBox'))return;
+   var st=document.createElement('style');
+   st.textContent='#cfAdminBox{border-top:1px solid var(--line,rgba(255,255,255,.12));margin-top:14px;padding-top:14px}#cfAdminBox input,#cfAdminBox select{width:100%;box-sizing:border-box;margin:5px 0 9px;padding:11px;border:1px solid var(--line,rgba(255,255,255,.15));border-radius:10px;background:var(--surface,rgba(255,255,255,.06));color:inherit}#cfAdminBox .cf-go{width:100%;padding:11px;border:0;border-radius:10px;background:#1c6dff;color:#fff;font-weight:800;cursor:pointer}#cfAdminBox .cf-go[disabled]{opacity:.6}#cfAdminBox .cf-go.alt{background:rgba(255,255,255,.12);margin-top:8px}.cf-sec{margin:12px 0 4px;padding:10px;border:1px solid var(--line,rgba(255,255,255,.12));border-radius:12px}.cf-inl{display:flex;gap:8px}.cf-inl input{flex:1;min-width:0}.cf-inl .cf-go{width:auto;padding:0 16px;margin:5px 0 9px}.cf-hint{font-size:12px;color:var(--muted,#a8b3c9);margin:5px 0 8px}#cfManage summary{cursor:pointer;font-weight:700;padding:8px 0}#cfTree details{margin:4px 0}#cfTree summary{display:flex;align-items:center;gap:8px;cursor:pointer;padding:6px 2px;font-size:13.5px}#cfTree summary span{flex:1;min-width:0;word-break:break-word}#cfTree .cf-s{margin-left:12px}#cfTree .cf-it{display:flex;align-items:center;gap:8px;margin-left:24px;padding:5px 2px;font-size:12.5px;border-top:1px solid var(--line,rgba(255,255,255,.08))}#cfTree .cf-it span{flex:1;min-width:0;word-break:break-word}#cfTree .cf-x,#cfTree .cf-e{width:auto;padding:4px 10px;border:0;border-radius:8px;background:rgba(255,255,255,.1);color:inherit;font-size:13px;cursor:pointer}#cfTree .cf-x{background:rgba(239,68,68,.22);color:#ff8a8a}';
+   document.head.appendChild(st);
+   var box=document.createElement('div');box.id='cfAdminBox';box.hidden=true;
+   box.innerHTML='<b>Admin: Custom Folders</b><p class="cf-hint">Main folder → Sub folder → Video (naam + video link + PDF 1 + PDF 2). Add karte hi website ke Videos section me dikhne lagega.</p>'+
+    '<div class="cf-sec"><label class="auth-field" for="cfMainName">1) Naya main folder</label><div class="cf-inl"><input id="cfMainName" type="text" maxlength="120" placeholder="Main folder ka naam"><button id="cfMainBtn" type="button" class="cf-go">Create</button></div></div>'+
+    '<div class="cf-sec"><label class="auth-field" for="cfSubMain">2) Sub folder banao</label><select id="cfSubMain"></select><div class="cf-inl"><input id="cfSubName" type="text" maxlength="120" placeholder="Sub folder ka naam"><button id="cfSubBtn" type="button" class="cf-go">Create</button></div></div>'+
+    '<div class="cf-sec"><label class="auth-field" for="cfItemMain">3) Video add karo</label><select id="cfItemMain"></select><select id="cfItemSub"></select>'+
+    '<input id="cfItemName" type="text" maxlength="200" placeholder="Video / class ka naam">'+
+    '<input id="cfItemVideo" type="url" inputmode="url" placeholder="Video stream link (https://…/dl/…)">'+
+    '<input id="cfItemP1" type="url" inputmode="url" placeholder="PDF 1 link (optional)">'+
+    '<input id="cfItemP2" type="url" inputmode="url" placeholder="PDF 2 link (optional)">'+
+    '<button id="cfItemBtn" type="button" class="cf-go">Add Video</button><button id="cfItemCancel" type="button" class="cf-go alt" hidden>Cancel edit</button></div>'+
+    '<div id="cfAdminMsg" class="auth-msg" role="status"></div>'+
+    '<details id="cfManage"><summary>Manage / Edit / Delete</summary><div id="cfTree"></div></details>';
+   card.appendChild(box);
+   $('cfItemMain').addEventListener('change',function(){cfFillItemSub()});
+   $('cfMainBtn').addEventListener('click',function(){cfRun(this,async function(){
+    var n=$('cfMainName').value.trim();if(!n)throw new Error('Main folder ka naam likhein.');
+    var row=await cfInsert({kind:'main',name:n});
+    $('cfMainName').value='';await window.SSC_CF.reload();
+    $('cfSubMain').value=row.id;$('cfItemMain').value=row.id;cfFillItemSub();
+    cfMsg('Main folder ban gaya: '+n,true);
+   })});
+   $('cfSubBtn').addEventListener('click',function(){cfRun(this,async function(){
+    var pid=$('cfSubMain').value,n=$('cfSubName').value.trim();
+    if(!pid)throw new Error('Pehle main folder chunein.');if(!n)throw new Error('Sub folder ka naam likhein.');
+    var row=await cfInsert({kind:'sub',parent_id:pid,name:n});
+    $('cfSubName').value='';await window.SSC_CF.reload();
+    $('cfItemMain').value=pid;cfFillItemSub(row.id);
+    cfMsg('Sub folder ban gaya: '+n,true);
+   })});
+   $('cfItemBtn').addEventListener('click',function(){cfRun(this,async function(){
+    var pid=$('cfItemSub').value,n=$('cfItemName').value.trim(),v=$('cfItemVideo').value.trim(),p1=$('cfItemP1').value.trim(),p2=$('cfItemP2').value.trim();
+    if(!pid)throw new Error('Pehle main + sub folder chunein.');if(!n)throw new Error('Video ka naam likhein.');
+    if(!v&&!p1&&!p2)throw new Error('Kam se kam ek link (video ya PDF) daalein.');
+    if(!cfUrlOk(v)||!cfUrlOk(p1)||!cfUrlOk(p2))throw new Error('Link http:// ya https:// se shuru hona chahiye.');
+    var fields={parent_id:pid,name:n,video_url:v||null,pdf1_url:p1||null,pdf2_url:p2||null};
+    if(cfEdit){
+     var r=await db.from('custom_content').update(fields).eq('id',cfEdit).select();
+     if(r.error)throw r.error;if(!r.data||!r.data.length)throw new Error('Update nahi hua (admin permission / SQL check karein).');
+     cfResetItemForm();await window.SSC_CF.reload();cfFillItemSub(pid);cfMsg('Video update ho gaya: '+n,true);
+    }else{
+     fields.kind='item';await cfInsert(fields);
+     $('cfItemName').value='';$('cfItemVideo').value='';$('cfItemP1').value='';$('cfItemP2').value='';
+     await window.SSC_CF.reload();cfFillItemSub(pid);cfMsg('Video add ho gaya: '+n+' ✔ (website par dikh raha hai)',true);
+    }
+   })});
+   $('cfItemCancel').addEventListener('click',function(){cfResetItemForm();cfMsg('')});
+   $('cfTree').addEventListener('click',function(e){
+    var d=e.target.closest('[data-del]'),ed=e.target.closest('[data-edit]');
+    if(d){
+     e.preventDefault();e.stopPropagation();
+     if(!confirm('“'+d.getAttribute('data-dn')+'” delete karna hai? Iske andar jo kuch hai wo bhi delete ho jayega.'))return;
+     cfRun(d,async function(){
+      var r=await db.from('custom_content').delete().eq('id',d.getAttribute('data-del')).select();
+      if(r.error)throw r.error;if(!r.data||!r.data.length)throw new Error('Delete nahi hua (admin permission / SQL check karein).');
+      if(cfEdit)cfResetItemForm();
+      await window.SSC_CF.reload();cfMsg('Delete ho gaya.',true);
+     });
+    }else if(ed){
+     e.preventDefault();
+     var id=ed.getAttribute('data-edit'),found=null;
+     cfData().forEach(function(m){m.subs.forEach(function(s){s.items.forEach(function(it){if(it.id===id)found={m:m,s:s,it:it}})})});
+     if(!found)return;
+     cfEdit=id;$('cfItemMain').value=found.m.id;cfFillItemSub(found.s.id);
+     $('cfItemName').value=found.it.t;$('cfItemVideo').value=found.it.v;$('cfItemP1').value=found.it.p1;$('cfItemP2').value=found.it.p2;
+     $('cfItemBtn').textContent='Save changes';$('cfItemCancel').hidden=false;
+     $('cfItemName').scrollIntoView({block:'center',behavior:'smooth'});cfMsg('Edit mode: badlav karke “Save changes” dabayein.',true);
+    }
+   });
+   cfFillSelects();
+  }
+  document.addEventListener('ssc-cf-updated',function(){cfFillSelects();refreshGrantList()});
+
+  async function refreshAccess(){
   checking=true;admin=false;legacy=false;grants={};
   try{
    var sr=await db.auth.getSession(),sess=sr.data&&sr.data.session;user=sess?sess.user:null;
@@ -1651,8 +1897,8 @@ route();
     if(!g.error&&Array.isArray(g.data))g.data.forEach(function(x){grants[x.folder_key]={exp:new Date(x.expires_at).getTime(),name:x.folder_name}});
    }
   }catch(e){console.warn('Access check failed',e)}
-  checking=false;installAdminPanel();
-  var box=$('accessAdminBox');if(box)box.hidden=!admin;
+  checking=false;installAdminPanel();installCfAdmin();
+  var box=$('accessAdminBox');if(box)box.hidden=!admin;var cfb=$('cfAdminBox');if(cfb)cfb.hidden=!admin;
   var st=$('myAccessStatus');
   if(st){
    var txt,ok=true;
