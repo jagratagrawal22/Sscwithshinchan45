@@ -422,9 +422,11 @@ body.sb-collapsed .sidebar{transform:translateX(-100%)}
 @media(max-width:600px){.pm{padding:18px 12px 26px;border-radius:20px}.pm-hd h1{font-size:34px}}
 
 /* ---------- CUSTOM FOLDERS (admin se add: Main > Sub > Video + PDF 1 + PDF 2) ---------- */
-.row.lec.cf .lacts{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;flex:0 0 auto;width:min(58%,380px);max-width:none}
+.row.lec.cf .lacts{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px;flex:0 0 auto;width:min(74%,620px);max-width:none}
+.row.lec.cf .act{overflow:hidden;text-overflow:ellipsis}
+.act.quiz{background:linear-gradient(135deg,#8a5cff,#5530d8)}
 .row.lec.cf .act{justify-content:center;padding:8px 6px;min-width:0;white-space:nowrap}
-@media(max-width:760px){.row.lec.cf .lacts{flex:1 1 100%;width:auto;max-width:none}}
+@media(max-width:760px){.row.lec.cf .lacts{flex:1 1 100%;width:auto;max-width:none;grid-template-columns:repeat(3,minmax(0,1fr))}}
 #ap.cfmode #apCopy,#ap.cfmode #apOpen,#ap.cfmode #apAlt{display:none}
 #ap.cfmode video{background:#000;object-fit:contain}
 </style>
@@ -1523,8 +1525,8 @@ function cfBuild(rows){
     var v=0,p=0;
     var subs=m.kids.filter(function(x){return x.kind==='sub'}).sort(srt).map(function(s){
       var items=s.kids.filter(function(x){return x.kind==='item'}).sort(srt).map(function(x,j){
-        if(x.video_url)v++;if(x.pdf1_url)p++;if(x.pdf2_url)p++;
-        return {id:x.id,t:x.name,v:x.video_url||'',p1:x.pdf1_url||'',p2:x.pdf2_url||'',idx:j,l:(x.name+' '+s.name+' '+m.name).toLowerCase()};
+        if(x.video_url)v++;if(x.pdf1_url)p++;if(x.pdf2_url)p++;if(x.pdf3_url)p++;
+        return {id:x.id,t:x.name,v:x.video_url||'',p1:x.pdf1_url||'',p2:x.pdf2_url||'',p3:x.pdf3_url||'',pn1:x.pdf1_name||'',pn2:x.pdf2_name||'',pn3:x.pdf3_name||'',q:x.quiz_url||'',idx:j,l:(x.name+' '+s.name+' '+m.name).toLowerCase()};
       });
       return {id:s.id,n:s.name,items:items};
     });
@@ -1583,8 +1585,10 @@ function cfSubPage(m,s){
 }
 function cfRow(m,it,n){
   var b=(it.v?'<button class="act play" data-a="cfv">'+ic('play','f')+' VIDEO</button>':'<span></span>')+
-        (it.p1?'<button class="act pdf" data-a="cfp1">'+ic('file')+' PDF 1</button>':'<span></span>')+
-        (it.p2?'<button class="act pdf" data-a="cfp2">'+ic('file')+' PDF 2</button>':'<span></span>');
+        (it.p1?'<button class="act pdf" data-a="cfp1" title="'+esc(it.pn1||'PDF 1')+'">'+ic('file')+' '+esc(it.pn1||'PDF 1')+'</button>':'<span></span>')+
+        (it.p2?'<button class="act pdf" data-a="cfp2" title="'+esc(it.pn2||'PDF 2')+'">'+ic('file')+' '+esc(it.pn2||'PDF 2')+'</button>':'<span></span>')+
+        (it.p3?'<button class="act pdf" data-a="cfp3" title="'+esc(it.pn3||'PDF 3')+'">'+ic('file')+' '+esc(it.pn3||'PDF 3')+'</button>':'<span></span>')+
+        (it.q?'<button class="act quiz" data-a="cfq">'+ic('down')+' QUIZ</button>':'<span></span>');
   return '<div class="row lec cf" data-fk="'+esc(cfKey(m))+'" data-ci="'+it.idx+'"><span class="n">'+n+'.</span><div class="tt">'+esc(it.t)+'</div><div class="lacts">'+b+'</div></div>';
 }
 function cfClick(e,s){
@@ -1592,7 +1596,10 @@ function cfClick(e,s){
   var r=b.closest('.row');if(!r||r.dataset.ci===undefined)return;
   var it=s.items[+r.dataset.ci];if(!it)return;
   if(b.dataset.a==='cfv')cfPlay(it);
-  else cfPdf(b.dataset.a==='cfp1'?it.p1:it.p2,it.t);
+  else if(b.dataset.a==='cfq')cfQuiz(it);
+  else if(b.dataset.a==='cfp1')cfPdf(it.p1,it.pn1||it.t);
+  else if(b.dataset.a==='cfp3')cfPdf(it.p3,it.pn3||it.t);
+  else cfPdf(it.p2,it.pn2||it.t);
 }
 /* Video app ke andar hi (full-screen overlay) chalta hai: naya browser tab nahi khulta, isliye upar link/address bar nahi dikhta */
 function cfPlay(it){
@@ -1610,6 +1617,20 @@ var cfLast=0;
 apv.addEventListener('timeupdate',function(){if(!aCur.cf||!aCur.id)return;var t=Date.now();if(t-cfLast<5000)return;cfLast=t;store('cfpos:'+aCur.id,String(Math.floor(apv.currentTime)))});
 apv.addEventListener('ended',function(){if(aCur.cf&&aCur.id)store('cfpos:'+aCur.id,'0')});
 apv.addEventListener('contextmenu',function(e){if(aCur.cf)e.preventDefault()});
+/* Quiz (HTML link) seedha khulta nahi, download hota hai (.html file) */
+async function cfQuiz(it){
+  var u=it.q;if(!u){toast('Quiz link nahi hai');return}
+  var fn=((it.t||'quiz')+' Quiz').replace(/[\\/:*?"<>|]+/g,' ').trim()+'.html';
+  try{
+    var r=await fetch(u);if(!r.ok)throw new Error('http '+r.status);
+    var bl=await r.blob();var url=URL.createObjectURL(new Blob([bl],{type:'text/html'}));
+    var a=document.createElement('a');a.href=url;a.download=fn;document.body.appendChild(a);a.click();a.remove();
+    setTimeout(function(){URL.revokeObjectURL(url)},30000);toast('Quiz download ho raha hai');
+  }catch(err){
+    var a2=document.createElement('a');a2.href=u;a2.target='_blank';a2.rel='noopener noreferrer';a2.setAttribute('download',fn);
+    document.body.appendChild(a2);a2.click();a2.remove();
+  }
+}
 function cfPdf(u,name){
   if(!u){toast('PDF link nahi hai');return}
   var a=document.createElement('a');a.href=u;a.target='_blank';a.rel='noopener noreferrer';a.setAttribute('download',(name||'file')+'.pdf');
@@ -1806,13 +1827,13 @@ route();
   }
   function cfUrlOk(u){return !u||/^https?:\/\//i.test(u)}
   function cfResetItemForm(){
-   cfEdit=null;['cfItemName','cfItemVideo','cfItemP1','cfItemP2'].forEach(function(id){$(id).value=''});
+   cfEdit=null;['cfItemName','cfItemVideo','cfItemP1','cfItemP2','cfItemPn1','cfItemPn2','cfItemP3','cfItemPn3','cfItemQuiz'].forEach(function(id){$(id).value=''});
    $('cfItemBtn').textContent='Add Video';$('cfItemCancel').hidden=true;
   }
   function installCfAdmin(){
    var card=document.querySelector('#authModal .auth-card');if(!card||$('cfAdminBox'))return;
    var st=document.createElement('style');
-   st.textContent='#cfAdminBox{border-top:1px solid var(--line,rgba(255,255,255,.12));margin-top:14px;padding-top:14px}#cfAdminBox input,#cfAdminBox select{width:100%;box-sizing:border-box;margin:5px 0 9px;padding:11px;border:1px solid var(--line,rgba(255,255,255,.15));border-radius:10px;background:var(--surface,rgba(255,255,255,.06));color:inherit}#cfAdminBox .cf-go{width:100%;padding:11px;border:0;border-radius:10px;background:#1c6dff;color:#fff;font-weight:800;cursor:pointer}#cfAdminBox .cf-go[disabled]{opacity:.6}#cfAdminBox .cf-go.alt{background:rgba(255,255,255,.12);margin-top:8px}.cf-sec{margin:12px 0 4px;padding:10px;border:1px solid var(--line,rgba(255,255,255,.12));border-radius:12px}.cf-inl{display:flex;gap:8px}.cf-inl input{flex:1;min-width:0}.cf-inl .cf-go{width:auto;padding:0 16px;margin:5px 0 9px}.cf-hint{font-size:12px;color:var(--muted,#a8b3c9);margin:5px 0 8px}#cfManage summary{cursor:pointer;font-weight:700;padding:8px 0}#cfTree details{margin:4px 0}#cfTree summary{display:flex;align-items:center;gap:8px;cursor:pointer;padding:6px 2px;font-size:13.5px}#cfTree summary span{flex:1;min-width:0;word-break:break-word}#cfTree .cf-s{margin-left:12px}#cfTree .cf-it{display:flex;align-items:center;gap:8px;margin-left:24px;padding:5px 2px;font-size:12.5px;border-top:1px solid var(--line,rgba(255,255,255,.08))}#cfTree .cf-it span{flex:1;min-width:0;word-break:break-word}#cfTree .cf-x,#cfTree .cf-e{width:auto;padding:4px 10px;border:0;border-radius:8px;background:rgba(255,255,255,.1);color:inherit;font-size:13px;cursor:pointer}#cfTree .cf-x{background:rgba(239,68,68,.22);color:#ff8a8a}';
+   st.textContent='#cfAdminBox{border-top:1px solid var(--line,rgba(255,255,255,.12));margin-top:14px;padding-top:14px}#cfAdminBox input,#cfAdminBox select{display:block;width:100%;min-height:46px;box-sizing:border-box;margin:5px 0 9px;padding:11px;direction:ltr;text-align:left;unicode-bidi:plain-text;font-size:16px;border:1px solid var(--line,rgba(255,255,255,.15));border-radius:10px;background:var(--surface,rgba(255,255,255,.06));color:inherit}#cfAdminBox .cf-go{width:100%;padding:11px;border:0;border-radius:10px;background:#1c6dff;color:#fff;font-weight:800;cursor:pointer}#cfAdminBox .cf-go[disabled]{opacity:.6}#cfAdminBox .cf-go.alt{background:rgba(255,255,255,.12);margin-top:8px}.cf-sec{margin:12px 0 4px;padding:10px;border:1px solid var(--line,rgba(255,255,255,.12));border-radius:12px}.cf-inl{display:block}.cf-inl input{width:100%}.cf-inl .cf-go{width:100%;margin:0 0 6px}.cf-hint{font-size:12px;color:var(--muted,#a8b3c9);margin:5px 0 8px}#cfManage summary{cursor:pointer;font-weight:700;padding:8px 0}#cfTree details{margin:4px 0}#cfTree summary{display:flex;align-items:center;gap:8px;cursor:pointer;padding:6px 2px;font-size:13.5px}#cfTree summary span{flex:1;min-width:0;word-break:break-word}#cfTree .cf-s{margin-left:12px}#cfTree .cf-it{display:flex;align-items:center;gap:8px;margin-left:24px;padding:5px 2px;font-size:12.5px;border-top:1px solid var(--line,rgba(255,255,255,.08))}#cfTree .cf-it span{flex:1;min-width:0;word-break:break-word}#cfTree .cf-x,#cfTree .cf-e{width:auto;padding:4px 10px;border:0;border-radius:8px;background:rgba(255,255,255,.1);color:inherit;font-size:13px;cursor:pointer}#cfTree .cf-x{background:rgba(239,68,68,.22);color:#ff8a8a}';
    document.head.appendChild(st);
    var box=document.createElement('div');box.id='cfAdminBox';box.hidden=true;
    box.innerHTML='<b>Admin: Custom Folders</b><p class="cf-hint">Main folder → Sub folder → Video (naam + video link + PDF 1 + PDF 2). Add karte hi website ke Videos section me dikhne lagega.</p>'+
@@ -1821,8 +1842,13 @@ route();
     '<div class="cf-sec"><label class="auth-field" for="cfItemMain">3) Video add karo</label><select id="cfItemMain"></select><select id="cfItemSub"></select>'+
     '<input id="cfItemName" type="text" maxlength="200" placeholder="Video / class ka naam">'+
     '<input id="cfItemVideo" type="url" inputmode="url" placeholder="Video stream link (https://…/dl/…)">'+
+    '<input id="cfItemPn1" type="text" maxlength="80" autocomplete="off" placeholder="PDF 1 ka naam (optional, jaise Notes)">'+
     '<input id="cfItemP1" type="url" inputmode="url" placeholder="PDF 1 link (optional)">'+
+    '<input id="cfItemPn2" type="text" maxlength="80" autocomplete="off" placeholder="PDF 2 ka naam (optional, jaise DPP)">'+
     '<input id="cfItemP2" type="url" inputmode="url" placeholder="PDF 2 link (optional)">'+
+    '<input id="cfItemPn3" type="text" maxlength="80" autocomplete="off" placeholder="PDF 3 ka naam (optional)">'+
+    '<input id="cfItemP3" type="url" inputmode="url" placeholder="PDF 3 link (optional)">'+
+    '<input id="cfItemQuiz" type="url" inputmode="url" placeholder="Quiz link — HTML file (download hoga)">'+
     '<button id="cfItemBtn" type="button" class="cf-go">Add Video</button><button id="cfItemCancel" type="button" class="cf-go alt" hidden>Cancel edit</button></div>'+
     '<div id="cfAdminMsg" class="auth-msg" role="status"></div>'+
     '<details id="cfManage"><summary>Manage / Edit / Delete</summary><div id="cfTree"></div></details>';
@@ -1844,18 +1870,18 @@ route();
     cfMsg('Sub folder ban gaya: '+n,true);
    })});
    $('cfItemBtn').addEventListener('click',function(){cfRun(this,async function(){
-    var pid=$('cfItemSub').value,n=$('cfItemName').value.trim(),v=$('cfItemVideo').value.trim(),p1=$('cfItemP1').value.trim(),p2=$('cfItemP2').value.trim();
+    var pid=$('cfItemSub').value,n=$('cfItemName').value.trim(),v=$('cfItemVideo').value.trim(),p1=$('cfItemP1').value.trim(),p2=$('cfItemP2').value.trim(),pn1=$('cfItemPn1').value.trim(),pn2=$('cfItemPn2').value.trim(),p3=$('cfItemP3').value.trim(),pn3=$('cfItemPn3').value.trim(),qz=$('cfItemQuiz').value.trim();
     if(!pid)throw new Error('Pehle main + sub folder chunein.');if(!n)throw new Error('Video ka naam likhein.');
-    if(!v&&!p1&&!p2)throw new Error('Kam se kam ek link (video ya PDF) daalein.');
-    if(!cfUrlOk(v)||!cfUrlOk(p1)||!cfUrlOk(p2))throw new Error('Link http:// ya https:// se shuru hona chahiye.');
-    var fields={parent_id:pid,name:n,video_url:v||null,pdf1_url:p1||null,pdf2_url:p2||null};
+    if(!v&&!p1&&!p2&&!p3&&!qz)throw new Error('Kam se kam ek link (video, PDF ya quiz) daalein.');
+    if(!cfUrlOk(v)||!cfUrlOk(p1)||!cfUrlOk(p2)||!cfUrlOk(p3)||!cfUrlOk(qz))throw new Error('Link http:// ya https:// se shuru hona chahiye.');
+    var fields={parent_id:pid,name:n,video_url:v||null,pdf1_url:p1||null,pdf2_url:p2||null,pdf1_name:pn1||null,pdf2_name:pn2||null,pdf3_url:p3||null,pdf3_name:pn3||null,quiz_url:qz||null};
     if(cfEdit){
      var r=await db.from('custom_content').update(fields).eq('id',cfEdit).select();
      if(r.error)throw r.error;if(!r.data||!r.data.length)throw new Error('Update nahi hua (admin permission / SQL check karein).');
      cfResetItemForm();await window.SSC_CF.reload();cfFillItemSub(pid);cfMsg('Video update ho gaya: '+n,true);
     }else{
      fields.kind='item';await cfInsert(fields);
-     $('cfItemName').value='';$('cfItemVideo').value='';$('cfItemP1').value='';$('cfItemP2').value='';
+     ['cfItemName','cfItemVideo','cfItemP1','cfItemP2','cfItemPn1','cfItemPn2','cfItemP3','cfItemPn3','cfItemQuiz'].forEach(function(id){$(id).value=''});
      await window.SSC_CF.reload();cfFillItemSub(pid);cfMsg('Video add ho gaya: '+n+' ✔ (website par dikh raha hai)',true);
     }
    })});
@@ -1877,7 +1903,7 @@ route();
      cfData().forEach(function(m){m.subs.forEach(function(s){s.items.forEach(function(it){if(it.id===id)found={m:m,s:s,it:it}})})});
      if(!found)return;
      cfEdit=id;$('cfItemMain').value=found.m.id;cfFillItemSub(found.s.id);
-     $('cfItemName').value=found.it.t;$('cfItemVideo').value=found.it.v;$('cfItemP1').value=found.it.p1;$('cfItemP2').value=found.it.p2;
+     $('cfItemName').value=found.it.t;$('cfItemVideo').value=found.it.v;$('cfItemP1').value=found.it.p1;$('cfItemP2').value=found.it.p2;$('cfItemPn1').value=found.it.pn1;$('cfItemPn2').value=found.it.pn2;$('cfItemP3').value=found.it.p3;$('cfItemPn3').value=found.it.pn3;$('cfItemQuiz').value=found.it.q;
      $('cfItemBtn').textContent='Save changes';$('cfItemCancel').hidden=false;
      $('cfItemName').scrollIntoView({block:'center',behavior:'smooth'});cfMsg('Edit mode: badlav karke “Save changes” dabayein.',true);
     }
