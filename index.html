@@ -1796,7 +1796,7 @@ route();
    host.innerHTML=mains.map(function(m){
     return '<details class="cf-m"><summary><span>📁 '+esc(m.n)+'</span><button type="button" class="cf-x" data-del="'+esc(m.id)+'" data-dn="'+esc(m.n)+'">✕</button></summary>'+
      (m.subs.map(function(s){
-      return '<details class="cf-s"><summary><span>'+esc(s.n)+' ('+s.items.length+')</span><button type="button" class="cf-x" data-del="'+esc(s.id)+'" data-dn="'+esc(s.n)+'">✕</button></summary>'+
+      return '<details class="cf-s"><summary><span>'+esc(s.n)+' ('+s.items.length+')</span><button type="button" class="cf-a" data-add="'+esc(s.id)+'" data-main="'+esc(m.id)+'">➕ Video</button><button type="button" class="cf-x" data-del="'+esc(s.id)+'" data-dn="'+esc(s.n)+'">✕</button></summary>'+
        s.items.map(function(it){return '<div class="cf-it"><span>'+esc(it.t)+'</span><button type="button" class="cf-e" data-edit="'+esc(it.id)+'">✎</button><button type="button" class="cf-x" data-del="'+esc(it.id)+'" data-dn="'+esc(it.t)+'">✕</button></div>'}).join('')+'</details>';
      }).join(''))+'</details>';
    }).join('');
@@ -1833,13 +1833,13 @@ route();
   function installCfAdmin(){
    var card=document.querySelector('#authModal .auth-card');if(!card||$('cfAdminBox'))return;
    var st=document.createElement('style');
-   st.textContent='#cfAdminBox{border-top:1px solid var(--line,rgba(255,255,255,.12));margin-top:14px;padding-top:14px}#cfAdminBox input,#cfAdminBox select{display:block;width:100%;min-height:46px;box-sizing:border-box;margin:5px 0 9px;padding:11px;direction:ltr;text-align:left;unicode-bidi:plain-text;font-size:16px;border:1px solid var(--line,rgba(255,255,255,.15));border-radius:10px;background:var(--surface,rgba(255,255,255,.06));color:inherit}#cfAdminBox .cf-go{width:100%;padding:11px;border:0;border-radius:10px;background:#1c6dff;color:#fff;font-weight:800;cursor:pointer}#cfAdminBox .cf-go[disabled]{opacity:.6}#cfAdminBox .cf-go.alt{background:rgba(255,255,255,.12);margin-top:8px}.cf-sec{margin:12px 0 4px;padding:10px;border:1px solid var(--line,rgba(255,255,255,.12));border-radius:12px}.cf-inl{display:block}.cf-inl input{width:100%}.cf-inl .cf-go{width:100%;margin:0 0 6px}.cf-hint{font-size:12px;color:var(--muted,#a8b3c9);margin:5px 0 8px}#cfManage summary{cursor:pointer;font-weight:700;padding:8px 0}#cfTree details{margin:4px 0}#cfTree summary{display:flex;align-items:center;gap:8px;cursor:pointer;padding:6px 2px;font-size:13.5px}#cfTree summary span{flex:1;min-width:0;word-break:break-word}#cfTree .cf-s{margin-left:12px}#cfTree .cf-it{display:flex;align-items:center;gap:8px;margin-left:24px;padding:5px 2px;font-size:12.5px;border-top:1px solid var(--line,rgba(255,255,255,.08))}#cfTree .cf-it span{flex:1;min-width:0;word-break:break-word}#cfTree .cf-x,#cfTree .cf-e{width:auto;padding:4px 10px;border:0;border-radius:8px;background:rgba(255,255,255,.1);color:inherit;font-size:13px;cursor:pointer}#cfTree .cf-x{background:rgba(239,68,68,.22);color:#ff8a8a}';
+   st.textContent='#cfAdminBox{border-top:1px solid var(--line,rgba(255,255,255,.12));margin-top:14px;padding-top:14px}#cfAdminBox input,#cfAdminBox select{display:block;width:100%;min-height:46px;box-sizing:border-box;margin:5px 0 9px;padding:11px;direction:ltr;text-align:left;unicode-bidi:plain-text;font-size:16px;border:1px solid var(--line,rgba(255,255,255,.15));border-radius:10px;background:var(--surface,rgba(255,255,255,.06));color:inherit}#cfAdminBox .cf-go{width:100%;padding:11px;border:0;border-radius:10px;background:#1c6dff;color:#fff;font-weight:800;cursor:pointer}#cfAdminBox .cf-go[disabled]{opacity:.6}#cfAdminBox .cf-go.alt{background:rgba(255,255,255,.12);margin-top:8px}.cf-sec{margin:12px 0 4px;padding:10px;border:1px solid var(--line,rgba(255,255,255,.12));border-radius:12px}.cf-inl{display:block}.cf-inl input{width:100%}.cf-inl .cf-go{width:100%;margin:0 0 6px}.cf-hint{font-size:12px;color:var(--muted,#a8b3c9);margin:5px 0 8px}#cfManage summary{cursor:pointer;font-weight:700;padding:8px 0}#cfTree details{margin:4px 0}#cfTree summary{display:flex;align-items:center;gap:8px;cursor:pointer;padding:6px 2px;font-size:13.5px}#cfTree summary span{flex:1;min-width:0;word-break:break-word}#cfTree .cf-s{margin-left:12px}#cfTree .cf-it{display:flex;align-items:center;gap:8px;margin-left:24px;padding:5px 2px;font-size:12.5px;border-top:1px solid var(--line,rgba(255,255,255,.08))}#cfTree .cf-it span{flex:1;min-width:0;word-break:break-word}#cfTree .cf-a{width:auto;padding:4px 10px;border:0;border-radius:8px;background:rgba(28,109,255,.28);color:#a9c9ff;font-size:12.5px;font-weight:700;cursor:pointer;white-space:nowrap}#cfTree .cf-x,#cfTree .cf-e{width:auto;padding:4px 10px;border:0;border-radius:8px;background:rgba(255,255,255,.1);color:inherit;font-size:13px;cursor:pointer}#cfTree .cf-x{background:rgba(239,68,68,.22);color:#ff8a8a}';
    document.head.appendChild(st);
    var box=document.createElement('div');box.id='cfAdminBox';box.hidden=true;
    box.innerHTML='<b>Admin: Custom Folders</b><p class="cf-hint">Main folder → Sub folder → Video (naam + video link + PDF 1 + PDF 2). Add karte hi website ke Videos section me dikhne lagega.</p>'+
     '<div class="cf-sec"><label class="auth-field" for="cfMainName">1) Naya main folder</label><div class="cf-inl"><input id="cfMainName" type="text" maxlength="120" placeholder="Main folder ka naam"><button id="cfMainBtn" type="button" class="cf-go">Create</button></div></div>'+
     '<div class="cf-sec"><label class="auth-field" for="cfSubMain">2) Sub folder banao</label><select id="cfSubMain"></select><div class="cf-inl"><input id="cfSubName" type="text" maxlength="120" placeholder="Sub folder ka naam"><button id="cfSubBtn" type="button" class="cf-go">Create</button></div></div>'+
-    '<div class="cf-sec"><label class="auth-field" for="cfItemMain">3) Video add karo</label><select id="cfItemMain"></select><select id="cfItemSub"></select>'+
+    '<div class="cf-sec"><label class="auth-field" for="cfItemMain">3) Video add karo (kisi bhi folder me, jitne chahein)</label><select id="cfItemMain"></select><select id="cfItemSub"></select>'+
     '<input id="cfItemName" type="text" maxlength="200" placeholder="Video / class ka naam">'+
     '<input id="cfItemVideo" type="url" inputmode="url" placeholder="Video stream link (https://…/dl/…)">'+
     '<input id="cfItemPn1" type="text" maxlength="80" autocomplete="off" placeholder="PDF 1 ka naam (optional, jaise Notes)">'+
@@ -1851,7 +1851,7 @@ route();
     '<input id="cfItemQuiz" type="url" inputmode="url" placeholder="Quiz link — HTML file (download hoga)">'+
     '<button id="cfItemBtn" type="button" class="cf-go">Add Video</button><button id="cfItemCancel" type="button" class="cf-go alt" hidden>Cancel edit</button></div>'+
     '<div id="cfAdminMsg" class="auth-msg" role="status"></div>'+
-    '<details id="cfManage"><summary>Manage / Edit / Delete</summary><div id="cfTree"></div></details>';
+    '<details id="cfManage"><summary>Manage: Video add / Edit / Delete</summary><div id="cfTree"></div></details>';
    card.appendChild(box);
    $('cfItemMain').addEventListener('change',function(){cfFillItemSub()});
    $('cfMainBtn').addEventListener('click',function(){cfRun(this,async function(){
@@ -1882,13 +1882,18 @@ route();
     }else{
      fields.kind='item';await cfInsert(fields);
      ['cfItemName','cfItemVideo','cfItemP1','cfItemP2','cfItemPn1','cfItemPn2','cfItemP3','cfItemPn3','cfItemQuiz'].forEach(function(id){$(id).value=''});
-     await window.SSC_CF.reload();cfFillItemSub(pid);cfMsg('Video add ho gaya: '+n+' ✔ (website par dikh raha hai)',true);
+     await window.SSC_CF.reload();cfFillItemSub(pid);cfMsg('Video add ho gaya: '+n+' ✔ (website par dikh raha hai). Isi folder me agla video bhi add kar sakte hain.',true);
     }
    })});
    $('cfItemCancel').addEventListener('click',function(){cfResetItemForm();cfMsg('')});
    $('cfTree').addEventListener('click',function(e){
-    var d=e.target.closest('[data-del]'),ed=e.target.closest('[data-edit]');
-    if(d){
+    var ad=e.target.closest('[data-add]'),d=e.target.closest('[data-del]'),ed=e.target.closest('[data-edit]');
+    if(ad){
+     e.preventDefault();e.stopPropagation();
+     cfResetItemForm();$('cfItemMain').value=ad.getAttribute('data-main');cfFillItemSub(ad.getAttribute('data-add'));
+     $('cfItemName').focus();$('cfItemName').scrollIntoView({block:'center',behavior:'smooth'});
+     cfMsg('Ab is sub folder me naya video ka naam aur links daalkar “Add Video” dabayein.',true);
+    }else if(d){
      e.preventDefault();e.stopPropagation();
      if(!confirm('“'+d.getAttribute('data-dn')+'” delete karna hai? Iske andar jo kuch hai wo bhi delete ho jayega.'))return;
      cfRun(d,async function(){
