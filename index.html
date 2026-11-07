@@ -1534,9 +1534,14 @@ function cfBuild(rows){
   });
   return mains;
 }
+var cfTries=0;
 async function cfLoad(){
   var db=window.SSC_DB;
-  if(!db){CF.loaded=true;return}
+  /* FIX: SSC_DB baad wale script me banta hai. Agar abhi ready nahi hai to thodi der ruk kar dobara try karo (pehle yahin se khali return ho jata tha, isliye refresh par folders gayab dikhte the). */
+  if(!db){
+    if(cfTries++<100){setTimeout(cfLoad,100);return}
+    CF.loaded=true;return;
+  }
   try{
     var all=[],from=0,step=1000;
     for(;;){
@@ -1636,7 +1641,7 @@ function cfPdf(u,name){
   var a=document.createElement('a');a.href=u;a.target='_blank';a.rel='noopener noreferrer';a.setAttribute('download',(name||'file')+'.pdf');
   document.body.appendChild(a);a.click();a.remove();
 }
-setTimeout(cfLoad,0);
+setTimeout(cfLoad,0);window.addEventListener('load',function(){if(window.SSC_DB&&!CF.loaded)cfLoad()});
 
 /* ---------- ACCESS REGISTRY: admin "Grant Access" list yahi se banti hai ---------- */
 /* Naya teacher folder (D.teachers me) ya naya *_ROOT folder add karoge to yeh list me apne aap aa jaega. */
